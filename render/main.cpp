@@ -71,6 +71,8 @@ public:
 static SDLTest_CommonState *gState;
 static SDL_Renderer *gRenderer = nullptr;
 SDL_Surface *screenSurface = nullptr;
+SDL_Window *gWindow = nullptr;
+
 
 static int CANVAS_WIDTH = 1080;
 static int CANVAS_HEIGHT = 1080;
@@ -152,8 +154,42 @@ Vector3 CanvasToViewport(float canvasX, float canvasY)
     return v;
 }
 
+void CreateWindow()
+{
+    gWindow = SDL_CreateWindow("SDL demo", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, CANVAS_WIDTH, CANVAS_HEIGHT, SDL_WINDOW_SHOWN);
+    screenSurface = SDL_GetWindowSurface(gWindow); //Fill the surface white
+    gRenderer = SDL_CreateRenderer(gWindow, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+}
+
+void DestroyWindow()
+{
+    SDL_DestroyWindow(gWindow);
+}
+
+bool CheckForEscape()
+{
+    SDL_Event e;
+    SDL_PollEvent(&e);
+    if (e.type == SDL_KEYUP) {
+        if (e.key.keysym.sym == SDLK_ESCAPE)
+            return true;
+    }
+
+    return false;
+}
+
+
+void WaitForEscape()
+{
+    while (!CheckForEscape()) {
+    }
+}
+
+
 void DoSpheres()
 {
+    CreateWindow();
+
     spheres.clear();
     spheres.emplace_back(Vector3(0.f, -1.f, 3.f), 1.f, Color(255, 0, 0));
     spheres.emplace_back(Vector3(2.f, 0.f, 4.f), 1.f, Color(0, 0, 255));
@@ -169,11 +205,17 @@ void DoSpheres()
         }
     }
     SDL_RenderPresent(gRenderer);
+
+    WaitForEscape();
+
+    DestroyWindow();
 }
 
 
 void DoSpiral()
 {
+    CreateWindow();
+    SDL_Event e;
     float angle = 0;
     float radius = 1;
 
@@ -184,7 +226,11 @@ void DoSpiral()
         angle += 3.14159f * .005f;
         radius += .1f;
         SDL_RenderPresent(gRenderer);
+        if (CheckForEscape())
+            break;
     }
+
+    DestroyWindow();
 }
 
 int main(int argc, char *argv[])
@@ -195,27 +241,33 @@ int main(int argc, char *argv[])
     /* Enable standard application logging */
     SDL_LogSetPriority(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_INFO);
     SDL_Init(SDL_INIT_VIDEO);
-    SDL_Window *window = SDL_CreateWindow("SDL demo", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, CANVAS_WIDTH, CANVAS_HEIGHT, SDL_WINDOW_SHOWN);
-    gRenderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 
     SDL_SetRenderDrawColor(gRenderer, 0x0A, 0x0A, 0x0A, 0xFF);
     SDL_RenderClear(gRenderer);
 
-    screenSurface = SDL_GetWindowSurface(window); //Fill the surface white
-
     while (quit == false) {
-        if (argc > 1 && !_stricmp(argv[1], "spiral"))
-            DoSpiral();
-        else
-            DoSpheres();
+        printf("\n\n");
+        printf("1 - Spheres\n");
+        printf("2 - Spiral\n");
+        printf("q - Quit\n");
 
-        while (SDL_PollEvent(&e)) {
-            if (e.type == SDL_QUIT)
-                quit = true;
+        int ch = getc(stdin);
+        if (ch == 'q') {
+            quit = true;
+        } else {
+            switch (ch) {
+            case '1':
+                DoSpheres();
+                break;
+            case SDLK_2:
+                DoSpiral();
+                break;
+            default:
+                break;
+            }
         }
     }
 
-    SDL_DestroyWindow(window);
     SDL_Quit();
 
     return 0;
