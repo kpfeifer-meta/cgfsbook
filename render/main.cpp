@@ -32,8 +32,11 @@ static float VIEWPORT_DIST = 1;
 std::vector<Sphere *> spheres;
 void PutPixel(int x, int y, int r, int g, int b)
 {
+    int sx = CANVAS_WIDTH / 2 + x;
+    int sy = CANVAS_HEIGHT / 2 - y;
+
     SDL_SetRenderDrawColor(gRenderer, r, g, b, 0xff);
-    SDL_RenderDrawPoint(gRenderer, x, y);
+    SDL_RenderDrawPoint(gRenderer, sx, sy);
 }
 
 SDL_bool IntersectRaySphere(Vector3 &O, Vector3 &D, Sphere &sphere)
@@ -62,7 +65,32 @@ Vector3 CanvasToViewport(float x, float y)
     return v;
 }
 
+void DoSpiral()
+{
+    SDL_Event e;
+    bool quit = false;
 
+    float angle = 0;
+    float radius = 1;
+    while (quit == false) {
+        float cy = radius * sin(angle);
+        float cx = radius * cos(angle);
+
+        int r = rand() & 1 ? 0xff : 0;
+        int g = 0;
+        int b = 0;
+
+        //        SDL_FillRect(screenSurface, NULL, SDL_MapRGB(screenSurface->format, r, g, b));
+        PutPixel(cx, cy, r, g, b);
+        angle += 3.14159f * .005f;
+        radius += .1f;
+        SDL_RenderPresent(gRenderer);
+        while (SDL_PollEvent(&e)) {
+            if (e.type == SDL_QUIT)
+                quit = true;
+        }
+    }
+}
 
 int main(int argc, char *argv[])
 {
@@ -73,39 +101,17 @@ int main(int argc, char *argv[])
     SDL_Window *window = SDL_CreateWindow("SDL demo", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, CANVAS_WIDTH, CANVAS_HEIGHT, SDL_WINDOW_SHOWN);
     gRenderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 
-    SDL_SetRenderDrawColor(gRenderer, 0xA0, 0xA0, 0xA0, 0xFF);
+    SDL_SetRenderDrawColor(gRenderer, 0x0A, 0x0A, 0x0A, 0xFF);
     SDL_RenderClear(gRenderer);
 
     screenSurface = SDL_GetWindowSurface(window); //Fill the surface white
 
-    //Hack to get window to stay up
-    SDL_Event e;
-    bool quit = false;
-    int x = 0;
-    int y = 0;
-    while (quit == false) {
-        int r = rand() & 1 ? 0xff : 0;
-        int g = rand() & 1 ? 0xff : 0;
-        int b = rand() & 1 ? 0xff : 0;
-
-//        SDL_FillRect(screenSurface, NULL, SDL_MapRGB(screenSurface->format, r, g, b));
-        PutPixel(x, y, r, g, b);
-        x++;
-        if (x >= CANVAS_WIDTH) {
-            x = 0;
-            SDL_RenderPresent(gRenderer);
-            y++;
-        }
-//        SDL_UpdateWindowSurface(window);
-        while (SDL_PollEvent(&e)) {
-            if (e.type == SDL_QUIT)
-                quit = true;
-        }
-    }
-    printf("howdy\n");
+    if (argc == 1 || !stricmp(argv[0] ,"spiral"))
+        DoSpiral();
 
     SDL_DestroyWindow(window);
     SDL_Quit();
 
     return 0;
 }
+
