@@ -176,18 +176,15 @@ void DoSpiral()
 {
     float angle = 0;
     float radius = 1;
-    float cy = radius * (float)sin(angle);
-    float cx = radius * (float)cos(angle);
 
-    int r = rand() & 1 ? 0xff : 0;
-    int g = 0;
-    int b = 0;
-
-    //        SDL_FillRect(screenSurface, NULL, SDL_MapRGB(screenSurface->format, r, g, b));
-    PutPixel((int)cx, (int)cy, r, g, b);
-    angle += 3.14159f * .005f;
-    radius += .1f;
-    SDL_RenderPresent(gRenderer);
+    while (radius < CANVAS_WIDTH/2) {
+        float cy = radius * (float)sin(angle);
+        float cx = radius * (float)cos(angle);
+        PutPixel((int)cx, (int)cy, 0xff, 0, 0);
+        angle += 3.14159f * .005f;
+        radius += .1f;
+        SDL_RenderPresent(gRenderer);
+    }
 }
 
 int main(int argc, char *argv[])
