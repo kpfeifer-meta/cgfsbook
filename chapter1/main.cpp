@@ -39,9 +39,27 @@ public:
         return *this;
     }
 
+    Vector3 operator*(float f) const
+    {
+        return { f * x, f * y, f * z };
+    }
+
+    Vector3 &operator*=(float f)
+    {
+        x *= f;
+        y *= f;
+        z *= f;
+        return *this;
+    }
+
     float Dot(const Vector3 &v) const
     {
         return (x * v.x) + (y * v.y) + (z * v.z);
+    }
+
+    float Length() const
+    {
+        return sqrtf(x * x + y * y + z * z);
     }
 
     float x, y, z;
@@ -54,18 +72,37 @@ class Color
     Color(int red, int green, int blue) : Color(red, green, blue, 255) {}
     Color(int red, int green, int blue, int alpha) : r(red), g(green), b(blue), a(alpha) {}
 
+    Color operator*(float f) const
+    {
+        return { static_cast<int>(f * static_cast<float>(r)), static_cast<int>(f * static_cast<float>(g)), static_cast<int>(f * static_cast<float>(b)), static_cast<int>(f * static_cast<float>(a)) };
+    }
+
+
     int r, g, b, a;
 };
 
 class Sphere
 {
 public:
-    Sphere() : radius(0), center(0,0,0), color(0,0,0,0){}
-    Sphere(Vector3 ctr, float rad, Color clr) : radius(rad), center(ctr), color(clr) {}
+    Sphere() : radius(0), center(0,0,0), color(0,0,0,0), specular(-1) {}
+    Sphere(Vector3 ctr, float rad, Color clr, float s=-1) : radius(rad), center(ctr), color(clr), specular(s) {}
 
     float radius;
     Vector3 center;
     Color color;
+    float specular;
+};
+
+class Light
+{
+public:
+    enum Type {ambient, point, directional};
+
+    Light(Type t, float i, Vector3 pos, Vector3 dir) : type(t), intensity(i), position(pos), direction(dir) {}
+    Type type;
+    float intensity;
+    Vector3 position;
+    Vector3 direction;
 };
 
 static SDLTest_CommonState *gState;
@@ -82,6 +119,7 @@ static float VIEWPORT_DIST = 1;
 static Color BACKGROUND = Color(255, 255, 255, 255);
 
 std::vector<Sphere> spheres;
+std::vector<Light> lights;
 
 void PutPixel(int x, int y, int r, int g, int b)
 {
@@ -96,6 +134,44 @@ void PutPixel(int x, int y, Color color)
 {
     PutPixel(x, y, color.r, color.g, color.b);
 }
+
+float ComputeLighting(Vector3 P, Vector3 N, Vector3 V, float s=-1)
+{
+    float i = 0;
+    Vector3 L;
+
+    for (Light light : lights) {
+        if (light.type == Light::Type::ambient)
+            i += light.intensity;
+        else
+        {
+            switch (light.type) {
+            case Light::Type::point:
+                L = light.position - P;
+                break;
+            case Light::Type::directional:
+                L = light.direction;
+                break;
+            }
+
+            float n_dot_l = N.Dot(L);
+            if (n_dot_l > 0) {
+                i += light.intensity * n_dot_l / (N.Length() * L.Length());
+            }
+
+            if (s != -1) {
+                Vector3 R = N * 2 * N.Dot(L) - L;
+                float r_dot_v = R.Dot(V);
+                if (r_dot_v > 0) {
+                    i += light.intensity * pow(r_dot_v / (R.Length() * V.Length()), s);
+                }
+            }
+        }
+    }
+
+    return i;
+}
+
 
 SDL_bool IntersectRaySphere(Vector3 &O, Vector3 &D, const Sphere* sphere, float &t1, float &t2)
 {
@@ -142,8 +218,13 @@ void TraceRay(Vector3 O, Vector3 D, float t_min, float t_max, Color& oColor)
 
     if (closestSphereIndex == -1)
         oColor = BACKGROUND;
-    else
-        oColor = spheres[closestSphereIndex].color;
+    else {
+        Sphere &s = spheres[closestSphereIndex];
+        Vector3 P = O + D * closest_t;
+        Vector3 N = P - s.center;
+        N = N * (1.f/N.Length());
+        oColor = s.color * ComputeLighting(P,N, D*-1, s.specular);
+    }
 }
 
 Vector3 CanvasToViewport(float canvasX, float canvasY)
@@ -192,9 +273,15 @@ void DoSpheres()
     CreateWindow();
 
     spheres.clear();
-    spheres.emplace_back(Vector3(0.f, -1.f, 3.f), 1.f, Color(255, 0, 0));
-    spheres.emplace_back(Vector3(2.f, 0.f, 4.f), 1.f, Color(0, 0, 255));
-    spheres.emplace_back(Vector3(-2.f, 0.f, 4.f), 1.f, Color(0, 255, 0));
+    spheres.emplace_back(Vector3(0.f, -1.f, 3.f), 1.f, Color(255, 0, 0), 500);
+    spheres.emplace_back(Vector3(2.f, 0.f, 4.f), 1.f, Color(0, 0, 255), 500);
+    spheres.emplace_back(Vector3(-2.f, 0.f, 4.f), 1.f, Color(0, 255, 0), 10);
+    spheres.emplace_back(Vector3(0, -5001, 0), 5000, Color(255, 255, 0), 1000);
+
+    lights.emplace_back(Light(Light::ambient, 0.2f, Vector3(0, 0, 0), Vector3(0, 0, 0)));
+    lights.emplace_back(Light(Light::point, 0.6f, Vector3(2, 1, 0), Vector3(0, 0, 0)));
+    lights.emplace_back(Light(Light::directional, 0.2f, Vector3(0, 0, 0), Vector3(1, 4, 4)));
+
 
     Vector3 O(0, 0, 0);
     Color color;
