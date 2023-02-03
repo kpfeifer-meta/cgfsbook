@@ -223,7 +223,9 @@ void TraceRay(Vector3 O, Vector3 D, float t_min, float t_max, Color& oColor)
         Vector3 P = O + D * closest_t;
         Vector3 N = P - s.center;
         N = N * (1.f/N.Length());
-        oColor = s.color * ComputeLighting(P,N, D*-1, s.specular);
+        float l = ComputeLighting(P, N, D * -1, s.specular);
+        l = SDL_clamp(l, 0, 1);
+        oColor = s.color * l;
     }
 }
 
