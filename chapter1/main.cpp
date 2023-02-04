@@ -152,18 +152,20 @@ float ComputeLighting(Vector3 P, Vector3 N, Vector3 V, float s=-1)
             case Light::Type::directional:
                 L = light.direction;
                 break;
+            default:
+                break;
             }
 
-            float n_dot_l = N.Dot(L);
+            const float n_dot_l = N.Dot(L);
             if (n_dot_l > 0) {
                 i += light.intensity * n_dot_l / (N.Length() * L.Length());
             }
 
             if (s != -1) {
                 Vector3 R = N * 2 * N.Dot(L) - L;
-                float r_dot_v = R.Dot(V);
+                const float r_dot_v = R.Dot(V);
                 if (r_dot_v > 0) {
-                    i += light.intensity * pow(r_dot_v / (R.Length() * V.Length()), s);
+                    i += light.intensity * static_cast<float>(pow((r_dot_v / (R.Length() * V.Length())), s));
                 }
             }
         }
@@ -182,58 +184,64 @@ SDL_bool IntersectRaySphere(Vector3 &O, Vector3 &D, const Sphere* sphere, float 
     float b = 2 * CO.Dot(D);
     float c = CO.Dot(CO) - r * r;
 
-    float discriminant = b * b - 4 * a * c;
+    const float discriminant = b * b - 4 * a * c;
     if (discriminant < 0) {
         t1 = t2 = -1;
         return SDL_FALSE;
     }
 
-    t1 = (-b + (float)sqrt(discriminant)) / (2 * a);
-    t2 = (-b - (float)sqrt(discriminant)) / (2 * a);
+    t1 = (-b + static_cast<float>(sqrt((double)discriminant))) / (2 * a);
+    t2 = (-b - static_cast<float>(sqrt((double)discriminant))) / (2 * a);
 
     return SDL_TRUE;
+}
+
+bool ClosestIntersection(Vector3 O, Vector3 D, float t_min, float t_max, Sphere** oSphere, float& oT)
+{
+    float closest_t = FLT_MAX;
+    Sphere* closest_sphere = nullptr;
+    for (unsigned i = 0; i < spheres.size(); i++) {
+        float t1, t2;
+        IntersectRaySphere(O, D, &spheres[i], t1, t2);
+        if (t1 >= t_min && t1 <= t_max && t1 < closest_t) {
+            closest_t = t1;
+            closest_sphere = &spheres[i];
+        }
+        if (t2 >= t_min && t2 <= t_max && t2 < closest_t) {
+            closest_t = t2;
+            closest_sphere = &spheres[i];
+        }
+    }
+
+    oT = closest_t;
+    *oSphere = closest_sphere;
+    return closest_sphere != nullptr;
 }
 
 void TraceRay(Vector3 O, Vector3 D, float t_min, float t_max, Color& oColor)
 {
     float closest_t = 100000000.f;
     int closestSphereIndex = -1;
+    Sphere *closestSphere = nullptr;
 
-    int sphereIndex = 0;
-    for (int i = 0; i < spheres.size(); i++) {
-        Sphere *s = &spheres[i];
-        float t1, t2;
-        if (IntersectRaySphere(O, D, s, t1, t2)) {
-            if (t1 >= t_min && t1 <= t_max && t1 < closest_t) {
-                closest_t = t1;
-                closestSphereIndex = sphereIndex;
-            }
-            if (t2 >= t_min && t2 <= t_max && t2 < closest_t) {
-                closest_t = t2;
-                closestSphereIndex = sphereIndex;
-            }
-        }
-        sphereIndex++;
-    }
-
-    if (closestSphereIndex == -1)
+    const bool found = ClosestIntersection(O, D, t_min, t_max, &closestSphere, closest_t);
+    if (!found)
         oColor = BACKGROUND;
     else {
-        Sphere &s = spheres[closestSphereIndex];
         Vector3 P = O + D * closest_t;
-        Vector3 N = P - s.center;
+        Vector3 N = P - closestSphere->center;
         N = N * (1.f/N.Length());
-        float l = ComputeLighting(P, N, D * -1, s.specular);
+        float l = ComputeLighting(P, N, D * -1, closestSphere->specular);
         l = SDL_clamp(l, 0, 1);
-        oColor = s.color * l;
+        oColor = closestSphere->color * l;
     }
 }
 
 Vector3 CanvasToViewport(float canvasX, float canvasY)
 {
     Vector3 v;
-    v.x = canvasX * (float)VIEWPORT_WIDTH / (float)CANVAS_WIDTH;
-    v.y = canvasY * (float)VIEWPORT_HEIGHT / (float)CANVAS_HEIGHT;
+    v.x = canvasX * static_cast<float>(VIEWPORT_WIDTH) / static_cast<float>(CANVAS_WIDTH);
+    v.y = canvasY * static_cast<float>(VIEWPORT_HEIGHT) / static_cast<float>(CANVAS_HEIGHT);
     v.z = VIEWPORT_DIST;
     return v;
 }
@@ -275,10 +283,10 @@ void DoSpheres()
     CreateWindow();
 
     spheres.clear();
-    spheres.emplace_back(Vector3(0.f, -1.f, 3.f), 1.f, Color(255, 0, 0), 500);
-    spheres.emplace_back(Vector3(2.f, 0.f, 4.f), 1.f, Color(0, 0, 255), 500);
-    spheres.emplace_back(Vector3(-2.f, 0.f, 4.f), 1.f, Color(0, 255, 0), 10);
-    spheres.emplace_back(Vector3(0, -5001, 0), 5000, Color(255, 255, 0), 1000);
+    spheres.emplace_back(Sphere(Vector3(0.f, -1.f, 3.f), 1.f, Color(255, 0, 0), 500));
+    spheres.emplace_back(Sphere(Vector3(2.f, 0.f, 4.f), 1.f, Color(0, 0, 255), 500));
+    spheres.emplace_back(Sphere(Vector3(-2.f, 0.f, 4.f), 1.f, Color(0, 255, 0), 10));
+    spheres.emplace_back(Sphere(Vector3(0, -5001, 0), 5000, Color(255, 255, 0), 1000));
 
     lights.emplace_back(Light(Light::ambient, 0.2f, Vector3(0, 0, 0), Vector3(0, 0, 0)));
     lights.emplace_back(Light(Light::point, 0.6f, Vector3(2, 1, 0), Vector3(0, 0, 0)));
@@ -333,6 +341,9 @@ int main(int argc, char *argv[])
     SDL_SetRenderDrawColor(gRenderer, 0x0A, 0x0A, 0x0A, 0xFF);
     SDL_RenderClear(gRenderer);
 
+    DoSpheres();
+
+#if 0
     while (quit == false) {
         printf("\n\n");
         printf("1 - Spheres\n");
@@ -355,6 +366,7 @@ int main(int argc, char *argv[])
             }
         }
     }
+#endif
 
     SDL_Quit();
 
