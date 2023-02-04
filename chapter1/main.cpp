@@ -77,6 +77,11 @@ class Color
         return { static_cast<int>(f * static_cast<float>(r)), static_cast<int>(f * static_cast<float>(g)), static_cast<int>(f * static_cast<float>(b)), static_cast<int>(f * static_cast<float>(a)) };
     }
 
+    Color operator+(Color color) const
+    {
+        return { r + color.r, g + color.g, b + color.b, a + color.a };
+    }
+
 
     int r, g, b, a;
 };
@@ -84,13 +89,14 @@ class Color
 class Sphere
 {
 public:
-    Sphere() : radius(0), center(0,0,0), color(0,0,0,0), specular(-1) {}
-    Sphere(Vector3 ctr, float rad, Color clr, float s=-1) : radius(rad), center(ctr), color(clr), specular(s) {}
+    Sphere() : radius(0), center(0,0,0), color(0,0,0,0), specular(-1), reflective(0) {}
+    Sphere(Vector3 ctr, float rad, Color clr, float s=-1, float r=0) : radius(rad), center(ctr), color(clr), specular(s), reflective(r) {}
 
     float radius;
     Vector3 center;
     Color color;
     float specular;
+    float reflective;
 };
 
 class Light
@@ -116,7 +122,7 @@ static int CANVAS_HEIGHT = 1080;
 static int VIEWPORT_WIDTH = 1;
 static int VIEWPORT_HEIGHT = 1;
 static float VIEWPORT_DIST = 1;
-static Color BACKGROUND = Color(255, 255, 255, 255);
+static Color BACKGROUND = Color(0, 0, 0, 255);
 
 std::vector<Sphere> spheres;
 std::vector<Light> lights;
@@ -135,47 +141,7 @@ void PutPixel(int x, int y, Color color)
     PutPixel(x, y, color.r, color.g, color.b);
 }
 
-float ComputeLighting(Vector3 P, Vector3 N, Vector3 V, float s=-1)
-{
-    float i = 0;
-    Vector3 L;
-
-    for (Light light : lights) {
-        if (light.type == Light::Type::ambient)
-            i += light.intensity;
-        else
-        {
-            switch (light.type) {
-            case Light::Type::point:
-                L = light.position - P;
-                break;
-            case Light::Type::directional:
-                L = light.direction;
-                break;
-            default:
-                break;
-            }
-
-            const float n_dot_l = N.Dot(L);
-            if (n_dot_l > 0) {
-                i += light.intensity * n_dot_l / (N.Length() * L.Length());
-            }
-
-            if (s != -1) {
-                Vector3 R = N * 2 * N.Dot(L) - L;
-                const float r_dot_v = R.Dot(V);
-                if (r_dot_v > 0) {
-                    i += light.intensity * static_cast<float>(pow((r_dot_v / (R.Length() * V.Length())), s));
-                }
-            }
-        }
-    }
-
-    return i;
-}
-
-
-SDL_bool IntersectRaySphere(Vector3 &O, Vector3 &D, const Sphere* sphere, float &t1, float &t2)
+SDL_bool IntersectRaySphere(Vector3 &O, Vector3 &D, const Sphere *sphere, float &t1, float &t2)
 {
     float r = sphere->radius;
     Vector3 CO = O - sphere->center;
@@ -196,10 +162,10 @@ SDL_bool IntersectRaySphere(Vector3 &O, Vector3 &D, const Sphere* sphere, float 
     return SDL_TRUE;
 }
 
-bool ClosestIntersection(Vector3 O, Vector3 D, float t_min, float t_max, Sphere** oSphere, float& oT)
+bool ClosestIntersection(Vector3 O, Vector3 D, float t_min, float t_max, Sphere **oSphere, float &oT)
 {
     float closest_t = FLT_MAX;
-    Sphere* closest_sphere = nullptr;
+    Sphere *closest_sphere = nullptr;
     for (unsigned i = 0; i < spheres.size(); i++) {
         float t1, t2;
         IntersectRaySphere(O, D, &spheres[i], t1, t2);
@@ -218,7 +184,61 @@ bool ClosestIntersection(Vector3 O, Vector3 D, float t_min, float t_max, Sphere*
     return closest_sphere != nullptr;
 }
 
-void TraceRay(Vector3 O, Vector3 D, float t_min, float t_max, Color& oColor)
+float ComputeLighting(Vector3 P, Vector3 N, Vector3 V, float s = -1)
+{
+    float i = 0;
+    Vector3 L;
+
+    for (Light light : lights) {
+        if (light.type == Light::Type::ambient)
+            i += light.intensity;
+        else
+        {
+            float t_max = 0;
+
+            switch (light.type) {
+            case Light::Type::point:
+                L = light.position - P;
+                t_max = 1;
+                break;
+            case Light::Type::directional:
+                L = light.direction;
+                t_max = FLT_MAX;
+                break;
+            default:
+                break;
+            }
+
+            Sphere *shadow_sphere = nullptr;
+            float shadow_t;
+            if (ClosestIntersection(P, L, 0.001f, t_max, &shadow_sphere, shadow_t))
+                continue;
+
+            // diffuse
+            const float n_dot_l = N.Dot(L);
+            if (n_dot_l > 0) {
+                i += light.intensity * n_dot_l / (N.Length() * L.Length());
+            }
+
+            if (s != -1) {
+                Vector3 R = N * 2 * N.Dot(L) - L;
+                const float r_dot_v = R.Dot(V);
+                if (r_dot_v > 0) {
+                    i += light.intensity * static_cast<float>(pow((r_dot_v / (R.Length() * V.Length())), s));
+                }
+            }
+        }
+    }
+
+    return i;
+}
+
+Vector3 ReflectRay(Vector3 R, Vector3 N)
+{
+    return (N * 2.f) * N.Dot(R) - R;
+}
+
+Color TraceRay(Vector3 O, Vector3 D, float t_min, float t_max, int recursion_depth)
 {
     float closest_t = 100000000.f;
     int closestSphereIndex = -1;
@@ -226,14 +246,21 @@ void TraceRay(Vector3 O, Vector3 D, float t_min, float t_max, Color& oColor)
 
     const bool found = ClosestIntersection(O, D, t_min, t_max, &closestSphere, closest_t);
     if (!found)
-        oColor = BACKGROUND;
+        return BACKGROUND;
     else {
         Vector3 P = O + D * closest_t;
         Vector3 N = P - closestSphere->center;
         N = N * (1.f/N.Length());
         float l = ComputeLighting(P, N, D * -1, closestSphere->specular);
         l = SDL_clamp(l, 0, 1);
-        oColor = closestSphere->color * l;
+        Color color = closestSphere->color * l;
+        float r = closestSphere->reflective;
+        if (recursion_depth <= 0 || r <= 0)
+            return color;
+
+        Vector3 R = ReflectRay(D * -1.f, N);
+        Color reflectedColor = TraceRay(P, R, 0.001f, FLT_MAX, recursion_depth - 1);
+        return color * (1.f - r) + reflectedColor * r;
     }
 }
 
@@ -283,10 +310,10 @@ void DoSpheres()
     CreateWindow();
 
     spheres.clear();
-    spheres.emplace_back(Sphere(Vector3(0.f, -1.f, 3.f), 1.f, Color(255, 0, 0), 500));
-    spheres.emplace_back(Sphere(Vector3(2.f, 0.f, 4.f), 1.f, Color(0, 0, 255), 500));
-    spheres.emplace_back(Sphere(Vector3(-2.f, 0.f, 4.f), 1.f, Color(0, 255, 0), 10));
-    spheres.emplace_back(Sphere(Vector3(0, -5001, 0), 5000, Color(255, 255, 0), 1000));
+    spheres.emplace_back(Sphere(Vector3(0.f, -1.f, 3.f), 1.f, Color(255, 0, 0), 500, 0.2f));
+    spheres.emplace_back(Sphere(Vector3(2.f, 0.f, 4.f), 1.f, Color(0, 0, 255), 500, 0.3f));
+    spheres.emplace_back(Sphere(Vector3(-2.f, 0.f, 4.f), 1.f, Color(0, 255, 0), 10, 0.4f));
+    spheres.emplace_back(Sphere(Vector3(0, -5001, 0), 5000, Color(255, 255, 0), 1000, 0.5f));
 
     lights.emplace_back(Light(Light::ambient, 0.2f, Vector3(0, 0, 0), Vector3(0, 0, 0)));
     lights.emplace_back(Light(Light::point, 0.6f, Vector3(2, 1, 0), Vector3(0, 0, 0)));
@@ -294,11 +321,10 @@ void DoSpheres()
 
 
     Vector3 O(0, 0, 0);
-    Color color;
     for (int x = -CANVAS_WIDTH / 2; x <= CANVAS_WIDTH / 2; x++) {
         for (int y=-CANVAS_HEIGHT/2; y<=CANVAS_HEIGHT/2; y++) {
-            Vector3 D = CanvasToViewport((float)x, (float)y);
-            TraceRay(O, D, 1, 1000000.f, color);
+            Vector3 D = CanvasToViewport(static_cast<float>(x), static_cast<float>(y));
+            const Color color = TraceRay(O, D, 1, 1000000.f, 1);
             PutPixel(x, y, color);
         }
     }
