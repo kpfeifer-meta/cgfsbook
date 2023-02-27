@@ -156,8 +156,9 @@ SDL_bool IntersectRaySphere(Vector3 &O, Vector3 &D, const Sphere *sphere, float 
         return SDL_FALSE;
     }
 
-    t1 = (-b + static_cast<float>(sqrt((double)discriminant))) / (2 * a);
-    t2 = (-b - static_cast<float>(sqrt((double)discriminant))) / (2 * a);
+    float d = sqrtf(discriminant);
+    t1 = (-b + d) / (2 * a);
+    t2 = (-b - d) / (2 * a);
 
     return SDL_TRUE;
 }
@@ -355,9 +356,13 @@ void DoSpiral()
     DestroyWindow();
 }
 
+#ifdef __cplusplus
+extern "C"
+#endif
 int main(int argc, char *argv[])
 {
     bool quit = false;
+    bool doMenu = false;
 
     /* Enable standard application logging */
     SDL_LogSetPriority(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_INFO);
@@ -366,32 +371,13 @@ int main(int argc, char *argv[])
     SDL_SetRenderDrawColor(gRenderer, 0x0A, 0x0A, 0x0A, 0xFF);
     SDL_RenderClear(gRenderer);
 
-    DoSpheres();
-
-#if 0
-    while (quit == false) {
-        printf("\n\n");
-        printf("1 - Spheres\n");
-        printf("q - Quit\n");
-
-        int ch = getc(stdin);
-        if (ch == 'q') {
-            quit = true;
-        } else {
-            switch (ch) {
-            case '1':
-                DoSpheres();
-                break;
-            case SDLK_2:
-                DoSpiral();
-                break;
-            default:
     if (doMenu)
     {
         while (quit == false) {
             printf("\n\n");
             printf("1 - Spheres\n");
             printf("2 - Spiral\n");
+            printf("q - Quit\n");
 
             int ch = getc(stdin);
             if (ch == 'q') {
@@ -405,6 +391,8 @@ int main(int argc, char *argv[])
                     DoSpiral();
                     break;
                 default:
+                    break;
+                }
             }
         }
     }
