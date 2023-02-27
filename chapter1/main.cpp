@@ -122,7 +122,7 @@ static int CANVAS_HEIGHT = 1080;
 static int VIEWPORT_WIDTH = 1;
 static int VIEWPORT_HEIGHT = 1;
 static float VIEWPORT_DIST = 1;
-static Color BACKGROUND = Color(0, 0, 0, 255);
+static Color BACKGROUND = Color(255, 255, 255, 255);
 
 std::vector<Sphere> spheres;
 std::vector<Light> lights;
@@ -304,7 +304,6 @@ void WaitForEscape()
     }
 }
 
-
 void DoSpheres()
 {
     CreateWindow();
@@ -373,7 +372,6 @@ int main(int argc, char *argv[])
     while (quit == false) {
         printf("\n\n");
         printf("1 - Spheres\n");
-        printf("2 - Spiral\n");
         printf("q - Quit\n");
 
         int ch = getc(stdin);
@@ -388,11 +386,30 @@ int main(int argc, char *argv[])
                 DoSpiral();
                 break;
             default:
-                break;
+    if (doMenu)
+    {
+        while (quit == false) {
+            printf("\n\n");
+            printf("1 - Spheres\n");
+            printf("2 - Spiral\n");
+
+            int ch = getc(stdin);
+            if (ch == 'q') {
+                quit = true;
+            } else {
+                switch (ch) {
+                case '1':
+                    DoSpheres();
+                    break;
+                case '2':
+                    DoSpiral();
+                    break;
+                default:
             }
         }
     }
-#endif
+    else
+        DoSpheres();
 
     SDL_Quit();
 
