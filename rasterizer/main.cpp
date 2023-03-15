@@ -23,6 +23,14 @@ public:
     float reflective;
 };
 
+class Vertex
+{
+  public:
+    Vertex(float x0, float y0, float h0) : x(x0), y(y0), h(h0) {}
+    float x, y;
+    float h;
+};
+
 class Light
 {
 public:
@@ -271,6 +279,64 @@ void DrawFilledTriangle(Vector3 p0, Vector3 p1, Vector3 p2, Color color)
 }
 
 
+void DrawShadedTriangle(Vertex p0, Vertex p1, Vertex p2, Color color)
+{
+    if (p1.y < p0.y) {
+        std::swap(p1, p0);
+    }
+    if (p2.y < p0.y) {
+        std::swap(p2, p0);
+    }
+    if (p2.y < p1.y) {
+        std::swap(p2, p1);
+    }
+
+    std::vector<float> x01 = Interpolate(p0.y, p0.x, p1.y, p1.x);
+    std::vector<float> h01 = Interpolate(p0.y, p0.h, p1.y, p1.h);
+    std::vector<float> x12 = Interpolate(p1.y, p1.x, p2.y, p2.x);
+    std::vector<float> h12 = Interpolate(p1.y, p1.h, p2.y, p2.h);
+    std::vector<float> x02 = Interpolate(p0.y, p0.x, p2.y, p2.x);
+    std::vector<float> h02 = Interpolate(p0.y, p0.h, p2.y, p2.h);
+
+    x01.pop_back();
+    std::vector<float> x012 = x01;
+    for (float f : x12) {
+        x012.push_back(f);
+    }
+
+    h01.pop_back();
+    std::vector<float> h012 = h01;
+    for (float f : h12) {
+        h012.push_back(f);
+    }
+
+
+    std::vector<float> x_left, x_right, h_left, h_right;
+
+    int m = floorf((float)x012.size() / 2);
+    if (x02[m] < x012[m]) {
+        x_left = x02;
+        h_left = h02;
+        x_right = x012;
+        h_right = h012;
+    } else {
+        x_left = x012;
+        h_left = h012;
+        x_right = x02;
+        h_right = h02;
+    }
+
+    for (int y = p0.y; y <= p2.y; y++) {
+        int x_l = x_left[y - p0.y];
+        int x_r = x_right[y - p0.y];
+        std::vector<float> h_segment = Interpolate(x_l, h_left[y - p0.y], x_r, h_right[y - p0.y]);
+        for (int x=x_l; x<=x_r; x++) {
+            Color shaded_color = color * h_segment[x - x_l];
+            PutPixel(x, y, shaded_color);
+        }
+    }
+}
+
 Vector3 CanvasToViewport(float canvasX, float canvasY)
 {
     Vector3 v;
@@ -285,6 +351,13 @@ void CreateWindow()
     gWindow = SDL_CreateWindow("SDL demo", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, CANVAS_WIDTH, CANVAS_HEIGHT, SDL_WINDOW_SHOWN);
     screenSurface = SDL_GetWindowSurface(gWindow); //Fill the surface white
     gRenderer = SDL_CreateRenderer(gWindow, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    SDL_SetRenderDrawColor(gRenderer, 0xff, 0xff, 0xff, 0xff);
+    SDL_Rect rect;
+    rect.x = 0;
+    rect.y = 0;
+    rect.w = CANVAS_WIDTH;
+    rect.h = CANVAS_HEIGHT;
+    SDL_RenderFillRect(gRenderer, &rect);
 }
 
 void DestroyWindow()
@@ -403,7 +476,8 @@ int main(int argc, char *argv[])
         CreateWindow();
         //DoSpheres();
         //DoLines();
-        DrawFilledTriangle(Vector3(-200, -250, 0), Vector3(200, 50, 0), Vector3(20, 250, 0), Color(0,255,0,255));
+        //DrawFilledTriangle(Vector3(-200, -250, 0), Vector3(200, 50, 0), Vector3(20, 250, 0), Color(0,255,0,255));
+        DrawShadedTriangle(Vertex(-200, -250, 1.f), Vertex(200, 50, 0.5f), Vertex(20, 250, 0.1f), Color(0, 255, 0, 255));
         SDL_RenderPresent(gRenderer);
         WaitForEscape();
         DestroyWindow();
