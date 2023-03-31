@@ -90,9 +90,9 @@ std::vector<float> Interpolate(int i0, float d0, int i1, float d1)
     return values;
 }
 
-void DrawLine(const Vector3 &point0, const Vector3 &point1, const Color &color)
+void DrawLine(const Vector2 &point0, const Vector2 &point1, const Color &color)
 {
-    Vector3 p0 = point0, p1 = point1;
+    Vector2 p0 = point0, p1 = point1;
     float dx = p1.x - p0.x;
     float dy = p1.y - p0.y;
     if (abs(dx) > abs(dy)) {
@@ -410,8 +410,8 @@ void DoSpheres()
 
 void DoLines()
 {
-    DrawLine(Vector3(-200, -100, 0), Vector3(240, 120, 0), Color(255, 0, 0));
-    DrawLine(Vector3(-50, -200, 0), Vector3(60, 240, 0), Color(0, 255, 0));
+    DrawLine(Vector2(-200, -100), Vector2(240, 120), Color(255, 0, 0));
+    DrawLine(Vector2(-50, -200), Vector2(60, 240), Color(0, 255, 0));
 }
 
 void DoSpiral()
@@ -433,6 +433,48 @@ void DoSpiral()
 
     DestroyWindow();
 }
+
+Vector2 ViewportToCanvas(float x, float y)
+{
+    return { x * (float)CANVAS_WIDTH / (float)VIEWPORT_WIDTH, y * (float)CANVAS_HEIGHT / (float)VIEWPORT_HEIGHT };
+}
+
+Vector2 ProjectVertex(Vector3 v){
+    float d = VIEWPORT_DIST;
+    return ViewportToCanvas(v.x * d / v.z, v.y * d / v.z);
+}
+
+void DoCube()
+{
+    // The four "front" vertices
+    Vector3 vAf = { -2, -0.5, 5 }, vBf = { -2, 0.5, 5 }, vCf = { -1, 0.5, 5 }, vDf = { -1, -0.5, 5 };
+
+        // The four "back" vertices
+    Vector3 vAb = { -2, -0.5, 6 }, vBb = { -2, 0.5, 6 }, vCb = { -1, 0.5, 6 }, vDb = { -1, -0.5, 6 };
+
+    auto BLUE = Color(0, 0, 255);
+    auto GREEN = Color(0, 255, 0);
+    auto RED = Color(255, 0, 0);
+
+        // The front face
+    DrawLine(ProjectVertex(vAf), ProjectVertex(vBf), BLUE);
+    DrawLine(ProjectVertex(vBf), ProjectVertex(vCf), BLUE);
+    DrawLine(ProjectVertex(vCf), ProjectVertex(vDf), BLUE);
+    DrawLine(ProjectVertex(vDf), ProjectVertex(vAf), BLUE);
+
+    // The back face
+    DrawLine(ProjectVertex(vAb), ProjectVertex(vBb), RED);
+    DrawLine(ProjectVertex(vBb), ProjectVertex(vCb), RED);
+    DrawLine(ProjectVertex(vCb), ProjectVertex(vDb), RED);
+    DrawLine(ProjectVertex(vDb), ProjectVertex(vAb), RED);
+
+    // The front-to-back edges
+    DrawLine(ProjectVertex(vAf), ProjectVertex(vAb), GREEN);
+    DrawLine(ProjectVertex(vBf), ProjectVertex(vBb), GREEN);
+    DrawLine(ProjectVertex(vCf), ProjectVertex(vCb), GREEN);
+    DrawLine(ProjectVertex(vDf), ProjectVertex(vDb), GREEN);
+}
+
 
 #ifdef __cplusplus
 extern "C"
@@ -477,7 +519,8 @@ int main(int argc, char *argv[])
         //DoSpheres();
         //DoLines();
         //DrawFilledTriangle(Vector3(-200, -250, 0), Vector3(200, 50, 0), Vector3(20, 250, 0), Color(0,255,0,255));
-        DrawShadedTriangle(Vertex(-200, -250, 1.f), Vertex(200, 50, 0.5f), Vertex(20, 250, 0.1f), Color(0, 255, 0, 255));
+        //DrawShadedTriangle(Vertex(-200, -250, 1.f), Vertex(200, 50, 0.5f), Vertex(20, 250, 0.1f), Color(0, 255, 0, 255));
+        DoCube();
         SDL_RenderPresent(gRenderer);
         WaitForEscape();
         DestroyWindow();

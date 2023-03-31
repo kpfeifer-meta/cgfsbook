@@ -59,3 +59,58 @@ class Vector3
 
     float x, y, z;
 };
+
+class Vector2
+{
+  public:
+    Vector2(float _x, float _y) : x(_x), y(_y) {}
+    Vector2() : x(0), y(0) {}
+
+    Vector2 operator-(const Vector2 &v) const
+    {
+        return { x - v.x, y - v.y };
+    }
+
+    Vector2 &operator-=(const Vector2 &v)
+    {
+        x -= v.x;
+        y -= v.y;
+        return *this;
+    }
+
+    Vector2 operator+(const Vector2 &v) const
+    {
+        return { x + v.x, y + v.y};
+    }
+
+    Vector2 &operator+=(const Vector2 &v)
+    {
+        x += v.x;
+        y += v.y;
+        return *this;
+    }
+
+    Vector2 operator*(float f) const
+    {
+        return { f * x, f * y};
+    }
+
+    Vector2 &operator*=(float f)
+    {
+        x *= f;
+        y *= f;
+        return *this;
+    }
+
+    float Dot(const Vector2 &v) const
+    {
+        return (x * v.x) + (y * v.y);
+    }
+
+    float Length() const
+    {
+        return sqrtf(x * x + y * y);
+    }
+
+    float x, y;
+};
